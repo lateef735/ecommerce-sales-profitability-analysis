@@ -1,0 +1,112 @@
+
+
+
+--code for the whole view
+
+select 
+o.OrderID,
+c.CustomerID,
+p.ProductID,
+pay.PaymentID
+OrderDate,
+Quantity,
+round(Discount, 2) as discount,
+PaymentMethod,
+PaymentStatus,
+age,
+case
+	when age < 20 then 'under 20'
+	when age between 21 and 30 then '21 - 30'
+	when age between 31 and 40 then '31 - 40'
+	when age between 41 and 50 then '41 - 50'
+	else 'above 50'
+end GroupedAge,
+DATEDIFF(MONTH, SignupDate, GETDATE()) as lifespan,
+CustomerSegment,
+PaymentStatus,
+ProductName,
+Category, 
+UnitPrice,
+ROUND(p.UnitPrice * o.Quantity * (1 - o.Discount), 2) AS NetRevenue
+
+from dbo.orders as o 
+
+inner join dbo.customers as c on o.CustomerID = c.CustomerID
+inner join dbo.products as p on o.ProductID = p.ProductID
+left join dbo.payments as pay on o.OrderID = pay.OrderID
+
+where age is not null
+
+
+
+-- product view 
+
+create view Product_View as 
+
+WITH ProductCategory AS (
+
+select 
+	ProductName,
+	PaymentStatus, 
+	Category, 
+	city,
+	sum (UnitPrice) as totalUnitprice,
+	sum (Quantity) as totalQuantity,
+	round (sum (p.UnitPrice * o.Quantity * ISNULL(o.Discount, 0)) , 2) as TotalDiscount,
+	round (sum (p.UnitPrice * o.Quantity * (1 - ISNULL(o.Discount, 0))) , 2) as NetRevenue
+
+
+from dbo.orders as o 
+	inner join dbo.customers as c on o.CustomerID = c.CustomerID
+	inner join dbo.products as p on o.ProductID = p.ProductID
+	left join dbo.payments as pay on o.OrderID = pay.OrderID
+
+where pay.PaymentStatus = 'paid'
+
+group by 
+	ProductName,
+	PaymentMethod,
+	PaymentStatus,
+	Category,
+	city
+)
+
+select 
+	*
+
+from 
+	ProductCategory
+
+
+-- customer view
+
+
+create view Customer_View as 
+
+with CustomerCategory as (
+
+select 
+	c.CustomerID,
+	c.Age,
+	c.city,
+	c.CustomerSegment,
+	round (avg (p.UnitPrice), 2) as AverageUnitprice,
+	round (avg (o.Quantity), 2) as AverageQuantity,	
+	round (avg (p.UnitPrice * o.Quantity * ISNULL(o.Discount, 0)) , 2) as AverageDiscount,
+	round (avg (p.UnitPrice * o.Quantity * (1 - ISNULL(o.Discount, 0))) , 2) as AverageNetRevenue
+
+from dbo.customers as c
+
+	inner join dbo.orders as o on c.CustomerID = o.CustomerID
+	inner join dbo.products as p on o.ProductID = p.ProductID
+
+
+Group BY 
+	c.CustomerID,
+	c.Age,
+	c.City,
+	c.CustomerSegment
+)
+
+select *
+from CustomerCategory
